@@ -3,7 +3,7 @@ import { LiffProvider } from '@/components/LiffProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_SHOP_NAME ? `${process.env.NEXT_PUBLIC_SHOP_NAME} 予約` : '予約',
+  title: process.env.NEXT_PUBLIC_SHOP_NAME ? `${process.env.NEXT_PUBLIC_SHOP_NAME}` : "予約",
 };
 
 export const viewport: Viewport = {
