@@ -30,18 +30,14 @@ export async function notifyAdmins(text: string): Promise<void> {
   await Promise.all(adminIdList().map((id) => pushText(id, text)));
 }
 
-// LINEミニアプリは https://miniapp.line.me/{LIFF ID}、従来のLIFFアプリは https://liff.line.me/{LIFF ID}
-const appBase = () => (process.env.LIFF_URL_BASE || "https://miniapp.line.me").replace(/\/$/, "");
+const appUrl = () =>
+  (process.env.NEXT_PUBLIC_APP_URL || "https://basic-line-reservation.vercel.app/").replace(/\/$/, "");
 
 /** 管理画面へのリンク（LINE 内で開ける形にする） */
 export function adminUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) return `${appBase()}/${appUrl}/basic-admin`;
-  return `${process.env.APP_URL ?? ""}/basic-admin`;
+  return `${appUrl()}/basic-admin`;
 }
 
 export function customerUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) return `${appBase()}/${appUrl}`;
-  return process.env.APP_URL ?? "";
+  return appUrl();
 }
