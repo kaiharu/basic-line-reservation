@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
 
 export function json(data: unknown, status = 200) {
-  return NextResponse.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 /** ルートハンドラ共通のエラーハンドリング */
@@ -17,7 +20,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.message }, e.status);
     console.error(e);
-    return json({ error: 'サーバーエラーが発生しました' }, 500);
+    return json({ error: "サーバーエラーが発生しました" }, 500);
   }
 }
 
@@ -25,7 +28,7 @@ export async function readJson<T = Record<string, unknown>>(req: Request): Promi
   try {
     return (await req.json()) as T;
   } catch {
-    throw new HttpError(400, 'リクエストの形式が正しくありません');
+    throw new HttpError(400, "リクエストの形式が正しくありません");
   }
 }
 
@@ -34,6 +37,7 @@ export function serializeReservation(r: {
   id: string | number;
   customer_name: string;
   phone: string | null;
+  party_size: number;
   note: string | null;
   start_at: Date;
   end_at: Date;
@@ -47,6 +51,7 @@ export function serializeReservation(r: {
     customerName: r.customer_name,
     lineName: r.line_name ?? null,
     phone: r.phone,
+    partySize: r.party_size,
     note: r.note,
     start: r.start_at.toISOString(),
     end: r.end_at.toISOString(),

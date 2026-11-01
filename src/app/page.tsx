@@ -1,12 +1,14 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { Gate, useLiff, type Me } from '@/components/LiffProvider';
-import { StatusPill, errMsg, useToast, type Reservation } from '@/components/ui';
-import { addDays, fmtSlot, weekdayOf, WEEKDAYS } from '@/lib/jst';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { Gate, useLiff, type Me } from "@/components/LiffProvider";
+import { StatusPill, errMsg, useToast, type Reservation } from "@/components/ui";
+import { addDays, fmtSlot, weekdayOf, WEEKDAYS } from "@/lib/jst";
+import { isJapaneseHoliday } from "@/lib/holiday-jp";
+import { PHONE_PATTERN, isValidPhone } from "@/lib/phone";
 
-type Slot = { start: string; end: string; label: string; state: 'available' | 'unavailable' };
+type Slot = { start: string; end: string; label: string; state: "available" | "unavailable" };
 type DaySlots = { date: string; closed: boolean; slots: Slot[] };
 
 export default function Page() {
@@ -14,36 +16,33 @@ export default function Page() {
 }
 
 function CustomerApp({ me }: { me: Me }) {
-  const [tab, setTab] = useState<'book' | 'mine'>('book');
+  const [tab, setTab] = useState<"book" | "mine">("book");
   const toast = useToast();
 
   return (
     <>
       <header className="header">
         <div className="header-inner">
-          <h1>
-            {me.config.shopName}
-            <span className="sub">予約</span>
-          </h1>
+          <h1>{me.config.shopName}</h1>
           <nav className="tabs">
-            <button className={`tab ${tab === 'book' ? 'active' : ''}`} onClick={() => setTab('book')}>
+            <button className={`tab ${tab === "book" ? "active" : ""}`} onClick={() => setTab("book")}>
               予約する
             </button>
-            <button className={`tab ${tab === 'mine' ? 'active' : ''}`} onClick={() => setTab('mine')}>
+            <button className={`tab ${tab === "mine" ? "active" : ""}`} onClick={() => setTab("mine")}>
               予約状況
             </button>
           </nav>
         </div>
       </header>
       <main className="container">
-        {tab === 'book' ? (
-          <BookTab me={me} toast={toast.show} onBooked={() => setTab('mine')} />
+        {tab === "book" ? (
+          <BookTab me={me} toast={toast.show} onBooked={() => setTab("mine")} />
         ) : (
           <MineTab toast={toast.show} />
         )}
         {me.isAdmin && (
-          <p style={{ textAlign: 'center', marginTop: 32 }}>
-            <Link href="/admin" className="btn small">
+          <p style={{ textAlign: "center", marginTop: 32 }}>
+            <Link href="/basic-admin" className="btn small">
               管理画面へ
             </Link>
           </p>
@@ -66,15 +65,20 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
   const [day, setDay] = useState<DaySlots | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Slot | null>(null);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
-      setDay(await api<DaySlots>(`/api/slots?date=${date}`));
+      const result = await api<DaySlots>(`/api/slots?date=${date}`);
+      if (requestIdRef.current !== requestId) return; // 古いリクエストの結果は無視する
+      setDay(result);
     } catch (e) {
+      if (requestIdRef.current !== requestId) return;
       toast(errMsg(e), true);
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) setLoading(false);
     }
   }, [api, date, toast]);
 
@@ -83,18 +87,19 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
     load();
   }, [load]);
 
-  const availableCount = day?.slots.filter((s) => s.state === 'available').length ?? 0;
+  const availableCount = day?.slots.filter((s) => s.state === "available").length ?? 0;
 
   return (
     <>
       <div className="dates" role="tablist" aria-label="日付">
         {dates.map((d) => {
           const wd = weekdayOf(d);
-          const [, m, dd] = d.split('-').map(Number);
+          const holiday = isJapaneseHoliday(d);
+          const [, m, dd] = d.split("-").map(Number);
           return (
             <button
               key={d}
-              className={`date-chip ${d === date ? 'active' : ''} ${wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''}`}
+              className={`date-chip ${d === date ? "active" : ""} ${wd === 0 || holiday ? "sun" : wd === 6 ? "sat" : ""}`}
               onClick={() => setDate(d)}
               aria-selected={d === date}
             >
@@ -106,7 +111,15 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
         })}
       </div>
 
-      <div className="section-title">時間を選んでください（{me.config.slotMinutes}分）</div>
+      <div className="section-title" style={{ marginBottom: 0 }}>
+        時間を選んでください
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+        ※ ご予約は1枠{me.config.slotMinutes}分制です。
+      </p>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        ※ お申し込み後、お店が承認した時点で予約確定となります。結果はLINEでお知らせします。
+      </p>
       <div className="card">
         {!day || loading ? (
           <div className="center" style={{ minHeight: 120 }}>
@@ -122,9 +135,9 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
               <button
                 key={s.start}
                 className="slot"
-                disabled={s.state !== 'available'}
+                disabled={s.state !== "available"}
                 onClick={() => setSelected(s)}
-                aria-label={`${s.label} ${s.state === 'available' ? '空きあり' : '予約不可'}`}
+                aria-label={`${s.label} ${s.state === "available" ? "空きあり" : "予約不可"}`}
               >
                 {s.label}
               </button>
@@ -132,9 +145,6 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
           </div>
         )}
       </div>
-      <p className="muted" style={{ fontSize: 12 }}>
-        ※ お申し込み後、お店が承認した時点で予約確定となります。結果はLINEでお知らせします。
-      </p>
 
       {selected && (
         <BookingSheet
@@ -143,7 +153,7 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
           onClose={() => setSelected(null)}
           onDone={() => {
             setSelected(null);
-            toast('予約リクエストを送信しました');
+            toast("予約リクエストを送信しました");
             onBooked();
           }}
           onConflict={(msg) => {
@@ -158,7 +168,11 @@ function BookTab({ me, toast, onBooked }: { me: Me; toast: (t: string, err?: boo
 }
 
 function BookingSheet({
-  me, slot, onClose, onDone, onConflict,
+  me,
+  slot,
+  onClose,
+  onDone,
+  onConflict,
 }: {
   me: Me;
   slot: Slot;
@@ -168,24 +182,32 @@ function BookingSheet({
 }) {
   const { api } = useLiff();
   const [name, setName] = useState(me.name);
-  const [phone, setPhone] = useState('');
-  const [note, setNote] = useState('');
+  const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [partySize, setPartySize] = useState(1);
+  const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const phoneValid = isValidPhone(phone.trim());
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!phoneValid) {
+      setPhoneTouched(true);
+      setError(phone.trim() === "" ? "電話番号を入力してください" : "電話番号の形式が正しくありません");
+      return;
+    }
     setSending(true);
-    setError('');
+    setError("");
     try {
-      await api('/api/reservations', {
-        method: 'POST',
-        body: { start: slot.start, customerName: name, phone, note },
+      await api("/api/reservations", {
+        method: "POST",
+        body: { start: slot.start, customerName: name, phone: phone.trim(), partySize, note },
       });
       onDone();
     } catch (err) {
       const msg = errMsg(err);
-      if (msg.includes('埋まって') || msg.includes('タッチの差')) onConflict(msg);
+      if (msg.includes("埋まって") || msg.includes("タッチの差")) onConflict(msg);
       else setError(msg);
     } finally {
       setSending(false);
@@ -199,27 +221,75 @@ function BookingSheet({
         <div className="when">{fmtSlot(slot.start, slot.end)}</div>
         <div className="field">
           <label htmlFor="name">お名前</label>
-          <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} required maxLength={50} autoComplete="name" />
+          <input
+            id="name"
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={50}
+            autoComplete="name"
+          />
         </div>
         <div className="field">
-          <label htmlFor="phone">
-            電話番号<span className="opt">任意</span>
-          </label>
-          <input id="phone" className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} autoComplete="tel" placeholder="090-1234-5678" />
+          <label htmlFor="partySize">ご来店人数</label>
+          <select
+            id="partySize"
+            className="input"
+            value={partySize}
+            onChange={(e) => setPartySize(Number(e.target.value))}
+          >
+            {Array.from({ length: 4 }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                {n}名
+              </option>
+            ))}
+          </select>
+          <span className="opt" style={{ fontSize: 12 }}>
+            ※ ブリードルームのサイズの都合上、最大4名までとなります。
+          </span>
+        </div>
+        <div className="field">
+          <label htmlFor="phone">電話番号</label>
+          <input
+            id="phone"
+            className="input"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => setPhoneTouched(true)}
+            required
+            maxLength={20}
+            autoComplete="tel"
+            placeholder="09012345678"
+            pattern={PHONE_PATTERN}
+            aria-invalid={phoneTouched && !phoneValid}
+          />
+          {phoneTouched && !phoneValid && (
+            <div className="notice">
+              {phone.trim() === "" ? "電話番号を入力してください" : "電話番号の形式が正しくありません"}
+            </div>
+          )}
         </div>
         <div className="field">
           <label htmlFor="note">
-            ご要望・メニューなど<span className="opt">任意</span>
+            ご要望・ご質問など<span className="opt">任意</span>
           </label>
-          <textarea id="note" className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+          <textarea
+            id="note"
+            className="input"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+          />
         </div>
         {error && <div className="notice">{error}</div>}
         <div className="actions">
           <button type="button" className="btn" onClick={onClose}>
             戻る
           </button>
-          <button type="submit" className="btn primary" disabled={sending || !name.trim()}>
-            {sending ? '送信中…' : 'リクエストを送る'}
+          <button type="submit" className="btn primary" disabled={sending || !name.trim() || !phoneValid}>
+            {sending ? "送信中…" : "リクエストを送る"}
           </button>
         </div>
       </form>
@@ -233,7 +303,7 @@ function MineTab({ toast }: { toast: (t: string, err?: boolean) => void }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await api<{ reservations: Reservation[] }>('/api/reservations');
+      const r = await api<{ reservations: Reservation[] }>("/api/reservations");
       setList(r.reservations);
     } catch (e) {
       toast(errMsg(e), true);
@@ -247,8 +317,8 @@ function MineTab({ toast }: { toast: (t: string, err?: boolean) => void }) {
   const cancel = async (r: Reservation) => {
     if (!window.confirm(`${fmtSlot(r.start, r.end)} の予約を取り消しますか？`)) return;
     try {
-      await api(`/api/reservations/${r.id}/cancel`, { method: 'POST' });
-      toast('予約を取り消しました');
+      await api(`/api/reservations/${r.id}/cancel`, { method: "POST" });
+      toast("予約を取り消しました");
       load();
     } catch (e) {
       toast(errMsg(e), true);
@@ -276,12 +346,14 @@ function MineTab({ toast }: { toast: (t: string, err?: boolean) => void }) {
             <div className="res-when">{fmtSlot(r.start, r.end)}</div>
             <StatusPill status={r.status} />
           </div>
-          <div className="res-meta">{r.customerName} 様{r.note ? `\n${r.note}` : ''}</div>
+          <div className="res-meta">
+            {r.customerName} 様（{r.partySize}名）{r.note ? `\n${r.note}` : ""}
+          </div>
           {r.adminMessage && <div className="res-msg">お店より：{r.adminMessage}</div>}
-          {(r.status === 'pending' || r.status === 'approved') && new Date(r.start).getTime() > now && (
+          {(r.status === "pending" || r.status === "approved") && new Date(r.start).getTime() > now && (
             <div className="actions">
               <button className="btn danger small" onClick={() => cancel(r)}>
-                {r.status === 'pending' ? 'リクエストを取り消す' : '予約をキャンセル'}
+                {r.status === "pending" ? "リクエストを取り消す" : "予約をキャンセル"}
               </button>
             </div>
           )}

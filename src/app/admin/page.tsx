@@ -1,14 +1,15 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Gate, useLiff, type Me } from '@/components/LiffProvider';
-import { StatusPill, errMsg, useToast, type Reservation } from '@/components/ui';
-import { addDays, fmtDateLabel, fmtSlot, fmtTime, todayJst, WEEKDAYS } from '@/lib/jst';
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Gate, useLiff, type Me } from "@/components/LiffProvider";
+import { StatusPill, errMsg, useToast, type Reservation } from "@/components/ui";
+import { addDays, fmtDateLabel, fmtSlot, fmtTime, todayJst, WEEKDAYS } from "@/lib/jst";
+import { isJapaneseHoliday } from "@/lib/holiday-jp";
 
 type Toast = (t: string, err?: boolean) => void;
 type Block = { id: string; start: string; end: string; reason: string | null };
-type Tab = 'requests' | 'approved' | 'schedule' | 'blocks' | 'hours';
+type Tab = "requests" | "approved" | "schedule" | "blocks" | "hours";
 
 export default function AdminPage() {
   return <Gate>{(me) => (me.isAdmin ? <AdminApp me={me} /> : <NotAdmin me={me} />)}</Gate>;
@@ -20,7 +21,8 @@ function NotAdmin({ me }: { me: Me }) {
       <div className="card" style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 17, marginTop: 0 }}>管理者権限がありません</h2>
         <p>
-          管理者として使うには、以下のユーザーIDを環境変数 <code>ADMIN_LINE_USER_IDS</code> に追加して再デプロイしてください。
+          管理者として使うには、以下のユーザーIDを環境変数 <code>ADMIN_LINE_USER_IDS</code>{" "}
+          に追加して再デプロイしてください。
         </p>
         <div className="mono">{me.userId}</div>
         <p style={{ marginTop: 16 }}>
@@ -34,15 +36,15 @@ function NotAdmin({ me }: { me: Me }) {
 }
 
 function AdminApp({ me }: { me: Me }) {
-  const [tab, setTab] = useState<Tab>('requests');
+  const [tab, setTab] = useState<Tab>("requests");
   const [pendingCount, setPendingCount] = useState(0);
   const toast = useToast();
   const tabs: [Tab, string][] = [
-    ['requests', 'リクエスト'],
-    ['approved', '確定予約'],
-    ['schedule', 'スケジュール'],
-    ['blocks', '予約不可設定'],
-    ['hours', '営業時間'],
+    ["requests", "リクエスト"],
+    ["approved", "確定予約"],
+    ["schedule", "スケジュール"],
+    ["blocks", "予約不可設定"],
+    ["hours", "営業時間"],
   ];
 
   return (
@@ -55,21 +57,21 @@ function AdminApp({ me }: { me: Me }) {
           </h1>
           <nav className="tabs">
             {tabs.map(([key, label]) => (
-              <button key={key} className={`tab ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
+              <button key={key} className={`tab ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
                 {label}
-                {key === 'requests' && pendingCount > 0 && <span className="badge">{pendingCount}</span>}
+                {key === "requests" && pendingCount > 0 && <span className="badge">{pendingCount}</span>}
               </button>
             ))}
           </nav>
         </div>
       </header>
       <main className="container">
-        {tab === 'requests' && <ReservationsTab status="pending" toast={toast.show} onCount={setPendingCount} />}
-        {tab === 'approved' && <ReservationsTab status="approved" toast={toast.show} />}
-        {tab === 'schedule' && <ScheduleTab toast={toast.show} />}
-        {tab === 'blocks' && <BlocksTab toast={toast.show} />}
-        {tab === 'hours' && <HoursTab toast={toast.show} />}
-        <PendingCounter onCount={setPendingCount} active={tab !== 'requests'} />
+        {tab === "requests" && <ReservationsTab status="pending" toast={toast.show} onCount={setPendingCount} />}
+        {tab === "approved" && <ReservationsTab status="approved" toast={toast.show} />}
+        {tab === "schedule" && <ScheduleTab toast={toast.show} />}
+        {tab === "blocks" && <BlocksTab toast={toast.show} />}
+        {tab === "hours" && <HoursTab toast={toast.show} />}
+        <PendingCounter onCount={setPendingCount} active={tab !== "requests"} />
       </main>
       {toast.node}
     </>
@@ -81,7 +83,7 @@ function PendingCounter({ onCount, active }: { onCount: (n: number) => void; act
   const { api } = useLiff();
   useEffect(() => {
     if (!active) return;
-    api<{ reservations: Reservation[] }>('/api/admin/reservations?status=pending')
+    api<{ reservations: Reservation[] }>("/api/admin/reservations?status=pending")
       .then((r) => onCount(r.reservations.length))
       .catch(() => {});
   }, [api, onCount, active]);
@@ -90,7 +92,15 @@ function PendingCounter({ onCount, active }: { onCount: (n: number) => void; act
 
 /* ---------- 承認待ち / 確定予約 ---------- */
 
-function ReservationsTab({ status, toast, onCount }: { status: 'pending' | 'approved'; toast: Toast; onCount?: (n: number) => void }) {
+function ReservationsTab({
+  status,
+  toast,
+  onCount,
+}: {
+  status: "pending" | "approved";
+  toast: Toast;
+  onCount?: (n: number) => void;
+}) {
   const { api } = useLiff();
   const [list, setList] = useState<Reservation[] | null>(null);
 
@@ -110,13 +120,17 @@ function ReservationsTab({ status, toast, onCount }: { status: 'pending' | 'appr
 
   if (!list) return <Loading />;
   if (list.length === 0) {
-    return <div className="card empty" style={{ marginTop: 20 }}>{status === 'pending' ? '承認待ちのリクエストはありません' : '今後の確定予約はありません'}</div>;
+    return (
+      <div className="card empty" style={{ marginTop: 20 }}>
+        {status === "pending" ? "承認待ちのリクエストはありません" : "今後の確定予約はありません"}
+      </div>
+    );
   }
 
   // 日付ごとにグループ化
   const groups = new Map<string, Reservation[]>();
   for (const r of list) {
-    const key = fmtSlot(r.start, r.end).split(' ')[0];
+    const key = fmtSlot(r.start, r.end).split(" ")[0];
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
 
@@ -136,16 +150,16 @@ function ReservationsTab({ status, toast, onCount }: { status: 'pending' | 'appr
 
 function AdminReservationCard({ r, toast, onChanged }: { r: Reservation; toast: Toast; onChanged: () => void }) {
   const { api } = useLiff();
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const expired = new Date(r.start).getTime() < Date.now();
 
-  const act = async (action: 'approve' | 'reject' | 'cancel') => {
-    const label = { approve: '承認', reject: '却下', cancel: 'キャンセル' }[action];
-    if (action !== 'approve' && !window.confirm(`この予約を${label}しますか？お客様にLINEで通知されます。`)) return;
+  const act = async (action: "approve" | "reject" | "cancel") => {
+    const label = { approve: "承認", reject: "却下", cancel: "キャンセル" }[action];
+    if (action !== "approve" && !window.confirm(`この予約を${label}しますか？お客様にLINEで通知されます。`)) return;
     setBusy(true);
     try {
-      await api(`/api/admin/reservations/${r.id}`, { method: 'PATCH', body: { action, message } });
+      await api(`/api/admin/reservations/${r.id}`, { method: "PATCH", body: { action, message } });
       toast(`${label}しました`);
       onChanged();
     } catch (e) {
@@ -162,13 +176,17 @@ function AdminReservationCard({ r, toast, onChanged }: { r: Reservation; toast: 
         <div className="res-when">
           {fmtTime(r.start)}〜{fmtTime(r.end)}
         </div>
-        {expired && r.status === 'pending' ? <span className="pill cancelled">期限切れ</span> : <StatusPill status={r.status} />}
+        {expired && r.status === "pending" ? (
+          <span className="pill cancelled">期限切れ</span>
+        ) : (
+          <StatusPill status={r.status} />
+        )}
       </div>
       <div className="res-meta">
-        {r.customerName} 様{r.lineName && r.lineName !== r.customerName ? `（LINE: ${r.lineName}）` : ''}
-        {r.phone ? `\nTEL: ${r.phone}` : ''}
-        {r.note ? `\n${r.note}` : ''}
-        {`\n申込: ${fmtSlot(r.createdAt, r.createdAt).split(' ')[0]} ${fmtTime(r.createdAt)}`}
+        {r.customerName} 様{r.lineName && r.lineName !== r.customerName ? `（LINE: ${r.lineName}）` : ""}
+        {r.phone ? `\nTEL: ${r.phone}` : ""}
+        {r.note ? `\n${r.note}` : ""}
+        {`\n申込: ${fmtSlot(r.createdAt, r.createdAt).split(" ")[0]} ${fmtTime(r.createdAt)}`}
       </div>
       <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
         <input
@@ -180,17 +198,17 @@ function AdminReservationCard({ r, toast, onChanged }: { r: Reservation; toast: 
         />
       </div>
       <div className="actions">
-        {r.status === 'pending' ? (
+        {r.status === "pending" ? (
           <>
-            <button className="btn danger" disabled={busy} onClick={() => act('reject')}>
+            <button className="btn danger" disabled={busy} onClick={() => act("reject")}>
               却下
             </button>
-            <button className="btn primary" disabled={busy || expired} onClick={() => act('approve')}>
+            <button className="btn primary" disabled={busy || expired} onClick={() => act("approve")}>
               承認する
             </button>
           </>
         ) : (
-          <button className="btn danger" disabled={busy} onClick={() => act('cancel')}>
+          <button className="btn danger" disabled={busy} onClick={() => act("cancel")}>
             お店都合でキャンセル
           </button>
         )}
@@ -204,7 +222,7 @@ function AdminReservationCard({ r, toast, onChanged }: { r: Reservation; toast: 
 type AdminDay = {
   date: string;
   closed: boolean;
-  slots: { start: string; end: string; label: string; state: 'available' | 'booked' | 'blocked' | 'past' }[];
+  slots: { start: string; end: string; label: string; state: "available" | "booked" | "blocked" | "past" }[];
   reservations: Reservation[];
   blocks: Block[];
 };
@@ -214,11 +232,16 @@ function ScheduleTab({ toast }: { toast: Toast }) {
   const [date, setDate] = useState(todayJst());
   const [day, setDay] = useState<AdminDay | null>(null);
   const [busy, setBusy] = useState(false);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
-      setDay(await api<AdminDay>(`/api/admin/day?date=${date}`));
+      const result = await api<AdminDay>(`/api/admin/day?date=${date}`);
+      if (requestIdRef.current !== requestId) return; // 古いリクエストの結果は無視する
+      setDay(result);
     } catch (e) {
+      if (requestIdRef.current !== requestId) return;
       toast(errMsg(e), true);
     }
   }, [api, date, toast]);
@@ -231,8 +254,11 @@ function ScheduleTab({ toast }: { toast: Toast }) {
   const addBlock = async (body: Record<string, unknown>, msg: string) => {
     setBusy(true);
     try {
-      const r = await api<{ conflicts: number }>('/api/admin/blocks', { method: 'POST', body });
-      toast(r.conflicts > 0 ? `${msg}（既存の予約が${r.conflicts}件あります。必要なら個別にキャンセルしてください）` : msg, r.conflicts > 0);
+      const r = await api<{ conflicts: number }>("/api/admin/blocks", { method: "POST", body });
+      toast(
+        r.conflicts > 0 ? `${msg}（既存の予約が${r.conflicts}件あります。必要なら個別にキャンセルしてください）` : msg,
+        r.conflicts > 0,
+      );
       load();
     } catch (e) {
       toast(errMsg(e), true);
@@ -244,8 +270,8 @@ function ScheduleTab({ toast }: { toast: Toast }) {
   const removeBlock = async (b: Block) => {
     setBusy(true);
     try {
-      await api(`/api/admin/blocks/${b.id}`, { method: 'DELETE' });
-      toast('予約不可を解除しました');
+      await api(`/api/admin/blocks/${b.id}`, { method: "DELETE" });
+      toast("予約不可を解除しました");
       load();
     } catch (e) {
       toast(errMsg(e), true);
@@ -259,15 +285,32 @@ function ScheduleTab({ toast }: { toast: Toast }) {
   return (
     <>
       <div className="row" style={{ marginTop: 16 }}>
-        <button className="btn small" style={{ flex: '0 0 auto' }} onClick={() => setDate(addDays(date, -1))} aria-label="前日">
+        <button
+          className="btn small"
+          style={{ flex: "0 0 auto" }}
+          onClick={() => setDate(addDays(date, -1))}
+          aria-label="前日"
+        >
           ◀
         </button>
         <input className="input" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
-        <button className="btn small" style={{ flex: '0 0 auto' }} onClick={() => setDate(addDays(date, 1))} aria-label="翌日">
+        <button
+          className="btn small"
+          style={{ flex: "0 0 auto" }}
+          onClick={() => setDate(addDays(date, 1))}
+          aria-label="翌日"
+        >
           ▶
         </button>
       </div>
-      <div className="section-title">{fmtDateLabel(date)}</div>
+      <div className="section-title">
+        {fmtDateLabel(date)}
+        {isJapaneseHoliday(date) && (
+          <span className="pill blocked" style={{ marginLeft: 8 }}>
+            祝日
+          </span>
+        )}
+      </div>
 
       {!day ? (
         <Loading />
@@ -311,20 +354,24 @@ function ScheduleTab({ toast }: { toast: Toast }) {
                       ))}
                       {rs.length === 0 && bs.length > 0 && <span className="pill blocked">予約不可</span>}
                       {rs.length === 0 && bs.length === 0 && (
-                        <span className="muted">{s.state === 'past' ? '受付終了' : '空き'}</span>
+                        <span className="muted">{s.state === "past" ? "受付終了" : "空き"}</span>
                       )}
                     </div>
                     {exact ? (
                       <button className="btn small" disabled={busy} onClick={() => removeBlock(exact)}>
                         解除
                       </button>
-                    ) : bs.length === 0 && rs.length === 0 && s.state !== 'past' ? (
+                    ) : bs.length === 0 && rs.length === 0 && s.state !== "past" ? (
                       <button
                         className="btn small"
                         disabled={busy}
                         onClick={() =>
                           addBlock(
-                            { date, startTime: fmtTime(s.start), endTime: fmtTime(s.end) === '00:00' ? '23:59' : fmtTime(s.end) },
+                            {
+                              date,
+                              startTime: fmtTime(s.start),
+                              endTime: fmtTime(s.end) === "00:00" ? "23:59" : fmtTime(s.end),
+                            },
                             `${s.label} を予約不可にしました`,
                           )
                         }
@@ -344,7 +391,10 @@ function ScheduleTab({ toast }: { toast: Toast }) {
               disabled={busy}
               onClick={() => {
                 if (window.confirm(`${fmtDateLabel(date)} を終日予約不可にしますか？`))
-                  addBlock({ date, allDay: true, reason: '臨時休業' }, `${fmtDateLabel(date)} を終日予約不可にしました`);
+                  addBlock(
+                    { date, allDay: true, reason: "臨時休業" },
+                    `${fmtDateLabel(date)} を終日予約不可にしました`,
+                  );
               }}
             >
               この日を終日 予約不可にする
@@ -359,9 +409,9 @@ function ScheduleTab({ toast }: { toast: Toast }) {
 function blockLabel(b: Block) {
   const s = new Date(b.start);
   const e = new Date(b.end);
-  const sd = fmtSlot(s, s).split(' ')[0];
-  const ed = fmtSlot(new Date(e.getTime() - 1), e).split(' ')[0];
-  if (fmtTime(s) === '00:00' && fmtTime(e) === '00:00') return sd === ed ? `${sd} 終日` : `${sd}〜${ed} 終日`;
+  const sd = fmtSlot(s, s).split(" ")[0];
+  const ed = fmtSlot(new Date(e.getTime() - 1), e).split(" ")[0];
+  if (fmtTime(s) === "00:00" && fmtTime(e) === "00:00") return sd === ed ? `${sd} 終日` : `${sd}〜${ed} 終日`;
   return `${sd} ${fmtTime(s)}〜${fmtTime(e)}`;
 }
 
@@ -373,14 +423,14 @@ function BlocksTab({ toast }: { toast: Toast }) {
   const [date, setDate] = useState(todayJst());
   const [endDate, setEndDate] = useState(todayJst());
   const [allDay, setAllDay] = useState(false);
-  const [startTime, setStartTime] = useState('12:00');
-  const [endTime, setEndTime] = useState('13:00');
-  const [reason, setReason] = useState('');
+  const [startTime, setStartTime] = useState("12:00");
+  const [endTime, setEndTime] = useState("13:00");
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setList((await api<{ blocks: Block[] }>('/api/admin/blocks')).blocks);
+      setList((await api<{ blocks: Block[] }>("/api/admin/blocks")).blocks);
     } catch (e) {
       toast(errMsg(e), true);
     }
@@ -394,17 +444,17 @@ function BlocksTab({ toast }: { toast: Toast }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const r = await api<{ conflicts: number }>('/api/admin/blocks', {
-        method: 'POST',
+      const r = await api<{ conflicts: number }>("/api/admin/blocks", {
+        method: "POST",
         body: { date, endDate: allDay ? endDate : undefined, allDay, startTime, endTime, reason },
       });
       toast(
         r.conflicts > 0
           ? `追加しました。この時間帯に既存の予約が${r.conflicts}件あります（自動ではキャンセルされません）`
-          : '予約不可の時間を追加しました',
+          : "予約不可の時間を追加しました",
         r.conflicts > 0,
       );
-      setReason('');
+      setReason("");
       load();
     } catch (err) {
       toast(errMsg(err), true);
@@ -416,8 +466,8 @@ function BlocksTab({ toast }: { toast: Toast }) {
   const remove = async (b: Block) => {
     if (!window.confirm(`${blockLabel(b)} の予約不可設定を削除しますか？`)) return;
     try {
-      await api(`/api/admin/blocks/${b.id}`, { method: 'DELETE' });
-      toast('削除しました');
+      await api(`/api/admin/blocks/${b.id}`, { method: "DELETE" });
+      toast("削除しました");
       load();
     } catch (e) {
       toast(errMsg(e), true);
@@ -435,7 +485,7 @@ function BlocksTab({ toast }: { toast: Toast }) {
           </label>
         </div>
         <div className="field">
-          <label>{allDay ? '期間' : '日付'}</label>
+          <label>{allDay ? "期間" : "日付"}</label>
           <div className="row">
             <input
               className="input"
@@ -449,8 +499,15 @@ function BlocksTab({ toast }: { toast: Toast }) {
             />
             {allDay && (
               <>
-                <span style={{ flex: '0 0 auto' }}>〜</span>
-                <input className="input" type="date" value={endDate} min={date} required onChange={(e) => setEndDate(e.target.value)} />
+                <span style={{ flex: "0 0 auto" }}>〜</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={endDate}
+                  min={date}
+                  required
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
               </>
             )}
           </div>
@@ -459,9 +516,21 @@ function BlocksTab({ toast }: { toast: Toast }) {
           <div className="field">
             <label>時間</label>
             <div className="row">
-              <input className="input" type="time" value={startTime} required onChange={(e) => setStartTime(e.target.value)} />
-              <span style={{ flex: '0 0 auto' }}>〜</span>
-              <input className="input" type="time" value={endTime} required onChange={(e) => setEndTime(e.target.value)} />
+              <input
+                className="input"
+                type="time"
+                value={startTime}
+                required
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+              <span style={{ flex: "0 0 auto" }}>〜</span>
+              <input
+                className="input"
+                type="time"
+                value={endTime}
+                required
+                onChange={(e) => setEndTime(e.target.value)}
+              />
             </div>
           </div>
         )}
@@ -469,7 +538,13 @@ function BlocksTab({ toast }: { toast: Toast }) {
           <label>
             理由<span className="opt">任意・お客様には表示されません</span>
           </label>
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={100} placeholder="例：休憩、研修、私用" />
+          <input
+            className="input"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={100}
+            placeholder="例：休憩、研修、私用"
+          />
         </div>
         <button className="btn primary block" disabled={busy}>
           追加する
@@ -510,7 +585,7 @@ function HoursTab({ toast }: { toast: Toast }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ hours: Hour[] }>('/api/admin/hours')
+    api<{ hours: Hour[] }>("/api/admin/hours")
       .then((r) => setHours(r.hours))
       .catch((e) => toast(errMsg(e), true));
   }, [api, toast]);
@@ -521,9 +596,9 @@ function HoursTab({ toast }: { toast: Toast }) {
   const save = async () => {
     setBusy(true);
     try {
-      const r = await api<{ hours: Hour[] }>('/api/admin/hours', { method: 'PUT', body: { hours } });
+      const r = await api<{ hours: Hour[] }>("/api/admin/hours", { method: "PUT", body: { hours } });
       setHours(r.hours);
-      toast('営業時間を保存しました');
+      toast("営業時間を保存しました");
     } catch (e) {
       toast(errMsg(e), true);
     } finally {
@@ -540,23 +615,45 @@ function HoursTab({ toast }: { toast: Toast }) {
       <div className="section-title">曜日ごとの受付時間</div>
       <div className="card">
         {ordered.map((h) => (
-          <div className={`hours-row ${h.closed ? 'off' : ''}`} key={h.weekday}>
-            <span className="wd" style={{ color: h.weekday === 0 ? 'var(--red)' : h.weekday === 6 ? '#2b6cd4' : undefined }}>
+          <div className={`hours-row ${h.closed ? "off" : ""}`} key={h.weekday}>
+            <span
+              className="wd"
+              style={{ color: h.weekday === 0 ? "var(--red)" : h.weekday === 6 ? "#2b6cd4" : undefined }}
+            >
               {WEEKDAYS[h.weekday]}
             </span>
             <label className="check" style={{ fontSize: 13 }}>
-              <input type="checkbox" checked={h.closed} onChange={(e) => update(h.weekday, { closed: e.target.checked })} />
+              <input
+                type="checkbox"
+                checked={h.closed}
+                onChange={(e) => update(h.weekday, { closed: e.target.checked })}
+              />
               定休
             </label>
-            <input className="input" type="time" value={h.open} disabled={h.closed} onChange={(e) => update(h.weekday, { open: e.target.value })} />
+            <input
+              className="input"
+              type="time"
+              value={h.open}
+              disabled={h.closed}
+              onChange={(e) => update(h.weekday, { open: e.target.value })}
+            />
             <span>〜</span>
-            <input className="input" type="time" value={h.close} disabled={h.closed} onChange={(e) => update(h.weekday, { close: e.target.value })} />
+            <input
+              className="input"
+              type="time"
+              value={h.close}
+              disabled={h.closed}
+              onChange={(e) => update(h.weekday, { close: e.target.value })}
+            />
           </div>
         ))}
       </div>
       <p className="muted" style={{ fontSize: 12 }}>
-        1枠 {me?.config.slotMinutes}分 / 予約は開始 {me?.config.minLeadHours}時間前まで・{me && Math.round((Date.parse(me.config.to) - Date.parse(me.config.from)) / 86400000)}日先まで受付
+        1枠 {me?.config.slotMinutes}分 / 予約は開始 {me?.config.minLeadHours}時間前まで・
+        {me && Math.round((Date.parse(me.config.to) - Date.parse(me.config.from)) / 86400000)}日先まで受付
         （環境変数で変更できます）
+        <br />
+        祝日は自動的に「日」の営業時間が適用されます。
       </p>
       <button className="btn primary block" disabled={busy} onClick={save}>
         保存する

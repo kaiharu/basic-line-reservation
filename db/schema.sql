@@ -38,6 +38,7 @@ create table if not exists reservations (
   line_name     text,
   customer_name text not null,
   phone         text,
+  party_size    smallint not null default 1 check (party_size between 1 and 20),
   note          text,
   start_at      timestamptz not null,
   end_at        timestamptz not null,
@@ -50,6 +51,9 @@ create table if not exists reservations (
 );
 create index if not exists reservations_user_idx   on reservations (line_user_id, start_at desc);
 create index if not exists reservations_status_idx on reservations (status, start_at);
+
+-- 既存環境向け：来店人数カラムを追加（新規作成時は上のcreate tableで既に入っている）
+alter table reservations add column if not exists party_size smallint not null default 1 check (party_size between 1 and 20);
 
 -- 二重予約防止：承認待ち・確定済みの予約同士は時間が重ならない（同時送信でもDBが弾く）
 do $$

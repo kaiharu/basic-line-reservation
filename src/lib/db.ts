@@ -1,4 +1,4 @@
-import postgres from 'postgres';
+import postgres from "postgres";
 
 // Supabase の「Transaction pooler」接続文字列(ポート6543)を DATABASE_URL に設定してください。
 // pooler ではプリペアドステートメントが使えないため prepare: false にしています。
@@ -10,13 +10,13 @@ declare global {
 
 function createClient() {
   const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL が設定されていません');
-  const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url) || url.includes('host=/');
+  if (!url) throw new Error("DATABASE_URL が設定されていません");
+  const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url) || url.includes("host=/");
   return postgres(url, {
     prepare: false,
     max: 5,
     idle_timeout: 20,
-    ssl: isLocal ? false : 'require',
+    ssl: isLocal ? false : "require",
   });
 }
 
@@ -26,7 +26,7 @@ export function db() {
   return globalThis.__sql;
 }
 
-export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type ReservationStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export type ReservationRow = {
   id: string;
@@ -34,6 +34,7 @@ export type ReservationRow = {
   line_name: string | null;
   customer_name: string;
   phone: string | null;
+  party_size: number;
   note: string | null;
   start_at: Date;
   end_at: Date;

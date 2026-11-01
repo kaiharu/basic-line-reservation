@@ -82,7 +82,7 @@ db/schema.sql             テーブル定義（Supabaseでそのまま実行）
 
 ### 4. 管理者を登録する
 
-1. LINEで `https://miniapp.line.me/<LIFF ID>/admin` を開きます。
+1. LINEで `https://miniapp.line.me/<LIFF ID>/basic-admin` を開きます。
 2. 「管理者権限がありません」という画面に自分のユーザーIDが表示されます。
 3. そのIDを Vercel の `ADMIN_LINE_USER_IDS` に設定して Redeploy します。複数人いる場合はカンマ区切りで並べます。
 4. 管理者も公式アカウントを友だち追加しておくと、新しいリクエストの通知が届きます。
@@ -116,7 +116,7 @@ npm run dev
 ```
 
 - お客様画面: http://localhost:3000/?as=dev-user
-- 管理画面: http://localhost:3000/admin?as=dev-admin
+- 管理画面: http://localhost:3000/basic-admin?as=dev-admin
 
 `?as=` の値を変えると別ユーザーとして操作できます。このダミーログインは `npm run dev` のときだけ有効で、本番ビルドでは常に無効です。開発ユーザーにはLINE通知を送らず、送信内容をコンソールに表示します。
 
