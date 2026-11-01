@@ -35,13 +35,13 @@ const appBase = () => (process.env.LIFF_URL_BASE || "https://miniapp.line.me").r
 
 /** 管理画面へのリンク（LINE 内で開ける形にする） */
 export function adminUrl(): string {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-  if (liffId) return `${appBase()}/${liffId}/basic-admin`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) return `${appBase()}/${appUrl}/basic-admin`;
   return `${process.env.APP_URL ?? ""}/basic-admin`;
 }
 
 export function customerUrl(): string {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-  if (liffId) return `${appBase()}/${liffId}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) return `${appBase()}/${appUrl}`;
   return process.env.APP_URL ?? "";
 }

@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     // サーバー側で枠の正当性・空きを再確認
     const day = await getDaySlots(date);
     const slot = day.slots.find((s) => s.start === startDate.toISOString());
-    if (!slot) throw new HttpError(400, "選択された時間は予約枠ではありません");
+    if (!slot) throw new HttpError(400, "選択された時間は受付対象外です");
     if (slot.state !== "available") throw new HttpError(409, "この時間はすでに埋まっているか、予約できません");
 
     const sql = db();
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     } catch (e) {
       // 排他制約（同時刻の二重予約）違反
       if ((e as { code?: string }).code === "23P01") {
-        throw new HttpError(409, "タッチの差で他の方の予約が入りました。別の時間をお選びください");
+        throw new HttpError(409, "既に予約がいっぱいです。別の時間をお選びください");
       }
       throw e;
     }
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
     await Promise.all([
       pushText(
         user.userId,
-        `予約リクエストを受け付けました。\n\n日時：${when}\nお名前：${customerName}\n\nお店からの承認をお待ちください。確定するとこちらでお知らせします。`,
+        `予約リクエストを受け付けました。\n\n日時：${when}\nお名前：${customerName}\n\nお店からの承認をお待ちください。予約が確定したらメッセージでお知らせします。`,
       ),
       notifyAdmins(
         `【新しい予約リクエスト】\n日時：${when}\nお名前：${customerName}\n人数：${guests}名` +
