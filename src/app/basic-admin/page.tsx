@@ -51,9 +51,16 @@ function AdminApp({ me }: { me: Me }) {
     <>
       <header className="header">
         <div className="header-inner">
-          <h1>
-            {me.config.shopName}
-            <span className="sub">管理</span>
+          <h1 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              {me.config.shopName}
+              <span className="sub">管理</span>
+            </div>
+            <span>
+              <Link href="/" className="btn small">
+                お客様画面へ
+              </Link>
+            </span>
           </h1>
           <nav className="tabs">
             {tabs.map(([key, label]) => (

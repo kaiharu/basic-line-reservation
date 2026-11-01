@@ -23,7 +23,16 @@ function CustomerApp({ me }: { me: Me }) {
     <>
       <header className="header">
         <div className="header-inner">
-          <h1>{me.config.shopName}</h1>
+          <h1 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {me.config.shopName}
+            {me.isAdmin && (
+              <span>
+                <Link href="/basic-admin" className="btn small">
+                  管理画面へ
+                </Link>
+              </span>
+            )}
+          </h1>
           <nav className="tabs">
             <button className={`tab ${tab === "book" ? "active" : ""}`} onClick={() => setTab("book")}>
               予約する
@@ -39,13 +48,6 @@ function CustomerApp({ me }: { me: Me }) {
           <BookTab me={me} toast={toast.show} onBooked={() => setTab("mine")} />
         ) : (
           <MineTab toast={toast.show} />
-        )}
-        {me.isAdmin && (
-          <p style={{ textAlign: "center", marginTop: 32 }}>
-            <Link href="/basic-admin" className="btn small">
-              管理画面へ
-            </Link>
-          </p>
         )}
       </main>
       {toast.node}
