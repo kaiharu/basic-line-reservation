@@ -82,8 +82,8 @@ db/schema.sql             テーブル定義（Supabaseでそのまま実行）
 
 ### 4. 管理者を登録する
 
-1. LINEで `https://miniapp.line.me/<LIFF ID>/basic-admin` を開きます。
-2. 「管理者権限がありません」という画面に自分のユーザーIDが表示されます。
+1. LINEで `https://miniapp.line.me/<LIFF ID>/my-id` を開きます
+2. 自分のユーザーIDが表示されます。
 3. そのIDを Vercel の `ADMIN_LINE_USER_IDS` に設定して Redeploy します。複数人いる場合はカンマ区切りで並べます。
 4. 管理者も公式アカウントを友だち追加しておくと、新しいリクエストの通知が届きます。
 

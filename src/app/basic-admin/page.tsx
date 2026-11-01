@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Gate, useLiff, type Me } from "@/components/LiffProvider";
 import { StatusPill, errMsg, useToast, type Reservation } from "@/components/ui";
 import { addDays, fmtDateLabel, fmtSlot, fmtTime, todayJst, WEEKDAYS } from "@/lib/jst";
@@ -12,25 +13,17 @@ type Block = { id: string; start: string; end: string; reason: string | null };
 type Tab = "requests" | "approved" | "schedule" | "blocks" | "hours";
 
 export default function AdminPage() {
-  return <Gate>{(me) => (me.isAdmin ? <AdminApp me={me} /> : <NotAdmin me={me} />)}</Gate>;
+  return <Gate>{(me) => (me.isAdmin ? <AdminApp me={me} /> : <NotAdmin />)}</Gate>;
 }
 
-function NotAdmin({ me }: { me: Me }) {
+function NotAdmin() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/");
+  }, [router]);
   return (
-    <main className="container">
-      <div className="card" style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 17, marginTop: 0 }}>管理者権限がありません</h2>
-        <p>
-          管理者として使うには、以下のユーザーIDを環境変数 <code>ADMIN_LINE_USER_IDS</code>{" "}
-          に追加して再デプロイしてください。
-        </p>
-        <div className="mono">{me.userId}</div>
-        <p style={{ marginTop: 16 }}>
-          <Link href="/" className="btn small">
-            お客様画面へ
-          </Link>
-        </p>
-      </div>
+    <main className="container center">
+      <div className="spinner" aria-label="読み込み中" />
     </main>
   );
 }
